@@ -1,0 +1,25 @@
+# STM32CubeIDE
+Debug/
+Release/
+build/
+*.o
+*.elf
+*.map
+*.list
+*.d
+*.su
+*.cyclo
+*.log
+
+# IDE settings
+.settings/
+.project
+.cproject
+
+# CubeMX generated files
+*.ioc
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
