@@ -33,7 +33,7 @@
 #include "uart_if.h"
 #include "config.h"
 #include "ui_led.h"
-
+#include "fan.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -138,6 +138,7 @@ int main(void)
   Heater_Init();
   UART_Init();
   UI_LED_Init();
+  Fan_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -158,7 +159,16 @@ int main(void)
 
 	  UI_LED_Task_100ms(in_range, alarm);
 
+	  static bool fan_on = false;
+
+	  if (!fan_on && (T_meas > T_ref + 2.0f)) fan_on = true;
+	  if ( fan_on && (T_meas < T_ref + 1.0f)) fan_on = false;
+
+	  Fan_Set(fan_on);
+
+
 	  HAL_Delay(100);
+
   }
   /* USER CODE END 3 */
 }

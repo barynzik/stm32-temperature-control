@@ -65,3 +65,12 @@ the current system status.
 - Alarm state: temperature outside the allowed limits
 
 The LED logic is implemented in a dedicated firmware module and updated
+
+## Additional control output (Fan)
+
+An additional control output device was implemented in the form of a cooling fan.
+The fan is automatically enabled when the measured temperature exceeds the
+reference temperature by a configurable threshold.
+
+The fan control logic is implemented as a separate module (`fan.c`, `fan.h`)
+and integrated into the main control loop.
