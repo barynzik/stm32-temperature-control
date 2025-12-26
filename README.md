@@ -74,3 +74,14 @@ reference temperature by a configurable threshold.
 
 The fan control logic is implemented as a separate module (`fan.c`, `fan.h`)
 and integrated into the main control loop.
+
+## Additional user input device
+
+An additional user input device was implemented using an analog potentiometer
+connected to the ADC input of the STM32 microcontroller.
+
+The potentiometer allows the user to adjust the temperature set-point locally,
+without using the serial interface. The ADC value is periodically sampled and
+converted into a temperature reference value within the allowed control range.
+
+This satisfies the requirement of an additional user input device.

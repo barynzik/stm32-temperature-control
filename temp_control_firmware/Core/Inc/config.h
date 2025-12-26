@@ -30,3 +30,7 @@
 #define NTC_BETA       3950.0f
 #define NTC_R0         10000.0f
 #define NTC_T0_K       298.15f
+// POT
+#define T_SETPOINT_MIN_C  20.0f
+#define T_SETPOINT_MAX_C  60.0f
+
