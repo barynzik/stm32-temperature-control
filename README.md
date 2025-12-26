@@ -85,3 +85,12 @@ without using the serial interface. The ADC value is periodically sampled and
 converted into a temperature reference value within the allowed control range.
 
 This satisfies the requirement of an additional user input device.
+
+## Serial communication with checksum
+
+The UART communication protocol includes a checksum mechanism to ensure data
+integrity. Each message contains a checksum field calculated using an XOR-based
+algorithm. Received messages are validated before being processed, and invalid
+frames are discarded.
+
+This fulfills the requirement of using a checksum in serial communication.
