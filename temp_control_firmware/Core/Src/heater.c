@@ -10,8 +10,13 @@
 
 #include "heater.h"
 
-void HEATER_SetDuty(float duty)
+void Heater_Init(void)
 {
-    (void)duty;
     // TODO
+}
+
+void Heater_SetDutyPercent(float duty)
+{
+    // TODO
+    (void)duty;
 }

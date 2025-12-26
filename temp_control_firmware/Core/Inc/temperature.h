@@ -18,6 +18,6 @@
  * @param adc_raw ADC reading (0..4095)
  * @return Temperature in degrees Celsius
  */
-float TEMP_AdcToCelsius(uint16_t adc_raw);
-
+void Temperature_Init(void);
+float Temperature_ReadC(void);
 #endif /* INC_TEMPERATURE_H_ */

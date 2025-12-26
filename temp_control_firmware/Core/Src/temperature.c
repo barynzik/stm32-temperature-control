@@ -12,8 +12,14 @@
 /**
  * @brief Convert ADC raw value to temperature in degrees Celsius.
  */
-float TEMP_AdcToCelsius(uint16_t adc_raw)
+
+void Temperature_Init(void)
 {
-    (void)adc_raw;
-    return 0.0f;  // TODO: implement conversion
+    // TODO
+}
+
+float Temperature_ReadC(void)
+{
+    // TODO
+    return 35.0f;
 }

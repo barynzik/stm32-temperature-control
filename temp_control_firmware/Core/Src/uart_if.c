@@ -9,7 +9,18 @@
 
 #include "uart_if.h"
 
+static float g_setpoint_c = 35.0f;
+
+void UART_Init(void)
+{
+    // TODO
+}
+
 void UART_Service(void)
 {
     // TODO
+}
+float UART_GetSetpointC(void)
+{
+    return g_setpoint_c;
 }

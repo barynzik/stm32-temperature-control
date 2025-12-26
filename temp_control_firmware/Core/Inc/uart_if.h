@@ -12,6 +12,9 @@
 /**
  * @brief Process UART communication.
  */
+void UART_Init(void);
 void UART_Service(void);
+float UART_GetSetpointC(void);
+
 
 #endif /* INC_UART_IF_H_ */

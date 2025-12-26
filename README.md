@@ -54,3 +54,14 @@ The GUI is implemented in Python using Tkinter and supports both a demo mode
 (without hardware) and serial communication mode.
 
 The GUI source code and screenshots are located in the `pc_gui/` directory.
+
+## Additional user output (LED)
+
+The system implements an additional user output device in the form of
+LED indicators on the STM32 NUCLEO board. The LEDs are used to visualize
+the current system status.
+
+- Normal operation: temperature within the safe range
+- Alarm state: temperature outside the allowed limits
+
+The LED logic is implemented in a dedicated firmware module and updated

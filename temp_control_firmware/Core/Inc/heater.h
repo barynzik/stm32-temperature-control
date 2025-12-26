@@ -12,7 +12,6 @@
 /**
  * @brief Set heater PWM duty cycle.
  */
-void HEATER_SetDuty(float duty);
-
-
+void Heater_Init(void);
+void Heater_SetDutyPercent(float duty);
 #endif /* INC_HEATER_H_ */

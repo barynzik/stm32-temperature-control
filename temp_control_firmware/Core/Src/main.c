@@ -23,6 +23,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "string.h"
+#include <stdbool.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -31,6 +32,8 @@
 #include "heater.h"
 #include "uart_if.h"
 #include "config.h"
+#include "ui_led.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -130,7 +133,11 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
-
+  Temperature_Init();
+  Control_Init();
+  Heater_Init();
+  UART_Init();
+  UI_LED_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -140,6 +147,18 @@ int main(void)
     /* USER CODE END WHILE */
 	  UART_Service();
     /* USER CODE BEGIN 3 */
+	  float T_meas = Temperature_ReadC();
+	  float T_ref  = UART_GetSetpointC();
+	  float u_pwm  = Control_Update(T_ref, T_meas);
+	  Heater_SetDutyPercent(u_pwm);
+
+	  bool in_range = (T_meas >= T_SAFE_MIN_C && T_meas <= T_SAFE_MAX_C);
+	  bool alarm    = (T_meas <  T_ALARM_MIN_C || T_meas >  T_ALARM_MAX_C);
+
+
+	  UI_LED_Task_100ms(in_range, alarm);
+
+	  HAL_Delay(100);
   }
   /* USER CODE END 3 */
 }

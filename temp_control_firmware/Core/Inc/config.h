@@ -10,8 +10,11 @@
 #pragma once
 
 // Control range
-#define T_MIN_C        20.0f
-#define T_MAX_C        60.0f
+#define T_SAFE_MIN_C  (30.0f)
+#define T_SAFE_MAX_C  (60.0f)
+#define T_ALARM_MIN_C (25.0f)
+#define T_ALARM_MAX_C (65.0f)
+
 
 // Sampling
 #define CONTROL_TS_S   0.1f   // 100 ms
