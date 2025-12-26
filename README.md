@@ -43,3 +43,14 @@ includes a staircase temperature reference and demonstrates negligible
 steady-state error for all operating points.
 
 Simulation model and results are provided in the `sim/` directory.
+
+## Desktop GUI
+
+A dedicated desktop graphical user interface (GUI) application was developed
+to allow setting the temperature reference and monitoring the system signals
+(measured temperature, reference value and control output).
+
+The GUI is implemented in Python using Tkinter and supports both a demo mode
+(without hardware) and serial communication mode.
+
+The GUI source code and screenshots are located in the `pc_gui/` directory.
