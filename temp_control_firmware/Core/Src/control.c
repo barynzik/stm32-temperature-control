@@ -8,11 +8,8 @@
  */
 
 #include "control.h"
+#include "config.h"
 
-#include "control.h"
-
-static float kp = 3.0f;
-static float ki = 0.15f;
 static float integ = 0.0f;
 
 void Control_Init(void)
@@ -23,10 +20,23 @@ void Control_Init(void)
 float Control_Update(float ref_c, float meas_c)
 {
     float e = ref_c - meas_c;
-    integ += e;
-    float u = kp * e + ki * integ;
 
-    if (u < 0.0f) u = 0.0f;
+    // Сначала считаем выход без насыщения
+    float u_unsat = KP * e + KI * integ;
+
+    // Насыщаем в диапазон PWM 0..100
+    float u = u_unsat;
+    if (u < 0.0f)   u = 0.0f;
     if (u > 100.0f) u = 100.0f;
+
+    // Anti-windup: не интегрируем, если в насыщении и ошибка толкает дальше
+    bool sat_high = (u >= 100.0f) && (e > 0.0f);
+    bool sat_low  = (u <= 0.0f)   && (e < 0.0f);
+
+    if (!(sat_high || sat_low))
+    {
+        integ += e * CONTROL_TS_S;
+    }
+
     return u;
 }

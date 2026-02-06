@@ -8,6 +8,8 @@
 
 #ifndef INC_CONTROL_H_
 #define INC_CONTROL_H_
+#include <stdbool.h>
+
 
 /**
  * @brief Compute PI controller output.

@@ -32,8 +32,9 @@
 #include "uart_if.h"
 #include "config.h"
 #include "ui_led.h"
+#include "setpoint.h"
 #include "fan.h"
-#include "input_pot.h"
+#include "button.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -77,6 +78,8 @@ ETH_HandleTypeDef heth;
 
 I2C_HandleTypeDef hi2c1;
 
+TIM_HandleTypeDef htim1;
+
 UART_HandleTypeDef huart3;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
@@ -93,6 +96,7 @@ static void MX_I2C1_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -136,48 +140,124 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   MX_ADC1_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-  Temperature_Init();
   Control_Init();
-  Heater_Init();
-  UART_Init();
+  UARTIF_Init();
   UI_LED_Init();
-  Fan_Init();
-  Pot_Init();
+  Heater_Init();
+  Button_Init();
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint32_t next_tick = HAL_GetTick();
+  const uint32_t Ts_ms = (uint32_t)(CONTROL_TS_S * 1000.0f + 0.5f);
+  uint32_t next_tel_ms = HAL_GetTick() + TELEMETRY_PERIOD_MS;
+
   while (1)
   {
+      // ---------- UART ----------
+      UARTIF_Task();
+
+      // ---------- ADC (NTC) ----------
+      uint16_t ntc_raw = 0;
+      HAL_ADC_Start(&hadc1);
+      if (HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK) {
+          ntc_raw = (uint16_t)HAL_ADC_GetValue(&hadc1);
+      }
+      HAL_ADC_Stop(&hadc1);
+
+      // ---------- Temperature ----------
+      float t_meas = Temperature_FromRaw(ntc_raw);
+      float t_ref  = Setpoint_GetC();
+
+      // ---------- Range flags ----------
+      bool in_range = (t_meas >= T_SAFE_MIN_C  && t_meas <= T_SAFE_MAX_C);
+      bool alarm    = (t_meas <  T_ALARM_MIN_C || t_meas >  T_ALARM_MAX_C);
+
+      // ---------- Button (setpoint adjust) ----------
+      Button_Task_100ms();
+
+      button_event_t ev = Button_ConsumeEvent();
+      if (ev != BTN_EVT_NONE) {
+          float sp = Setpoint_GetC();
+
+          if (ev == BTN_EVT_SHORT) sp += 0.5f;
+          else if (ev == BTN_EVT_LONG) sp -= 0.5f;
+
+          Setpoint_SetC(sp);
+
+          t_ref = Setpoint_GetC();
+      }
+      printf("PC13=%d\r\n", (int)HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13));
+      HAL_Delay(200);
+
+      // ---------- Control + Safety ----------
+      static bool prev_alarm = false;
+      float pwm = 0.0f;
+
+      if (alarm) {
+          // при входе в аварию сбрасываем PI, чтобы не было "ударного" PWM после выхода
+          if (!prev_alarm) {
+              Control_Init();
+          }
+
+          pwm = 0.0f;
+          Heater_SetDutyPercent(0.0f);
+
+          // в аварии включаем продувку
+          Fan_Set(true);
+      } else {
+          // нормальный режим
+          pwm = Control_Update(t_ref, t_meas);
+          Heater_SetDutyPercent(pwm);
+
+          // ---------- Fan control (hysteresis) ----------
+          static bool fan_on = false;
+          if (!fan_on && (t_meas > t_ref + 2.0f)) fan_on = true;
+          if ( fan_on && (t_meas < t_ref + 1.0f)) fan_on = false;
+          Fan_Set(fan_on);
+      }
+
+      prev_alarm = alarm;
+
+      // ---------- Telemetry (periodic + on request) ----------
+      bool send_tel = UARTIF_ConsumeTelemetryRequest();
+
+      uint32_t now_tel = HAL_GetTick();
+      if ((int32_t)(now_tel - next_tel_ms) >= 0) {
+          send_tel = true;
+          next_tel_ms += TELEMETRY_PERIOD_MS;   // держим ровный период
+      }
+
+      if (send_tel) {
+          UARTIF_SendTelemetry(t_meas, t_ref, pwm);
+      }
+
+
+      // ---------- LED indication ----------
+      UI_LED_Task_100ms(in_range, alarm);
+
+      // ---------- Sampling period (fixed Ts) ----------
+      next_tick += Ts_ms;
+      uint32_t now = HAL_GetTick();
+
+      if ((int32_t)(next_tick - now) > 0) {
+          HAL_Delay(next_tick - now);
+      } else {
+          // если вычисления/передача заняли слишком долго — пересинхронизация
+          next_tick = now;
+      }
+  }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  float T_meas = Temperature_ReadC();
-	  float T_ref = Pot_ReadSetpointC();
-	  float u_pwm  = Control_Update(T_ref, T_meas);
-	  Heater_SetDutyPercent(u_pwm);
-
-	  bool in_range = (T_meas >= T_SAFE_MIN_C && T_meas <= T_SAFE_MAX_C);
-	  bool alarm    = (T_meas <  T_ALARM_MIN_C || T_meas >  T_ALARM_MAX_C);
-
-
-	  UI_LED_Task_100ms(in_range, alarm);
-
-	  static bool fan_on = false;
-
-	  if (!fan_on && (T_meas > T_ref + 2.0f)) fan_on = true;
-	  if ( fan_on && (T_meas < T_ref + 1.0f)) fan_on = false;
-
-	  Fan_Set(fan_on);
-
-
-	  HAL_Delay(100);
-
   }
   /* USER CODE END 3 */
-}
-
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -268,7 +348,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_144CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -377,6 +457,86 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 0;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 3599;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.BreakFilter = 0;
+  sBreakDeadTimeConfig.Break2State = TIM_BREAK2_DISABLE;
+  sBreakDeadTimeConfig.Break2Polarity = TIM_BREAK2POLARITY_HIGH;
+  sBreakDeadTimeConfig.Break2Filter = 0;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+  HAL_TIM_MspPostInit(&htim1);
+
+}
+
+/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -463,8 +623,12 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(FAN_GPIO_Port, FAN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
@@ -472,11 +636,18 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : USER_Btn_Pin */
-  GPIO_InitStruct.Pin = USER_Btn_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  /*Configure GPIO pin : BTN_USER_Pin */
+  GPIO_InitStruct.Pin = BTN_USER_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(BTN_USER_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : FAN_Pin */
+  GPIO_InitStruct.Pin = FAN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(USER_Btn_GPIO_Port, &GPIO_InitStruct);
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
+  HAL_GPIO_Init(FAN_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LD1_Pin LD3_Pin LD2_Pin */
   GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin|LD2_Pin;

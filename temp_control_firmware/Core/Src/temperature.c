@@ -8,18 +8,20 @@
  */
 
 #include "temperature.h"
+#include <math.h>
+#include "config.h"
 
-/**
- * @brief Convert ADC raw value to temperature in degrees Celsius.
- */
-
-void Temperature_Init(void)
+float Temperature_FromRaw(uint16_t raw)
 {
-    // TODO
-}
+  if (raw <= 0) raw = 1;
+  if (raw >= 4095) raw = 4094;
 
-float Temperature_ReadC(void)
-{
-    // TODO
-    return 35.0f;
+  float v = ((float)raw / 4095.0f) * ADC_VREF;
+
+  float r_ntc = R_FIXED * (v / (ADC_VREF - v));
+
+  float invT = (1.0f / NTC_T0_K) + (1.0f / NTC_BETA) * logf(r_ntc / NTC_R0);
+  float T = 1.0f / invT;
+
+  return T - 273.15f;
 }

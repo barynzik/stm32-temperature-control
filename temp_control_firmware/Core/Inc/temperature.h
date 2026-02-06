@@ -12,12 +12,5 @@
 
 #include <stdint.h>
 
-
-/**
- * @brief Convert ADC raw value to temperature in degrees Celsius.
- * @param adc_raw ADC reading (0..4095)
- * @return Temperature in degrees Celsius
- */
-void Temperature_Init(void);
-float Temperature_ReadC(void);
+float Temperature_FromRaw(uint16_t raw);
 #endif /* INC_TEMPERATURE_H_ */

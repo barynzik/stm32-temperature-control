@@ -4,6 +4,38 @@ import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+def crc8_0x07(data: bytes) -> int:
+    crc = 0
+    for x in data:
+        crc ^= x
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x07) & 0xFF if (crc & 0x80) else (crc << 1) & 0xFF
+    return crc
+
+
+def add_crc_frame(payload: str) -> bytes:
+    c = crc8_0x07(payload.encode("ascii"))
+    return f"{payload}*{c:02X}\n".encode("ascii")
+
+
+def strip_and_check_crc(line: str) -> str | None:
+    """
+    Returns payload if CRC ok, else None.
+    Accepts lines like: "<payload>*<2hex>"
+    """
+    line = line.strip()
+    if "*" not in line:
+        return None
+    payload, crc_hex = line.rsplit("*", 1)
+    if len(crc_hex) != 2:
+        return None
+    try:
+        rx = int(crc_hex, 16)
+    except ValueError:
+        return None
+    calc = crc8_0x07(payload.encode("ascii"))
+    return payload if calc == rx else None
+
 # Optional serial
 try:
     import serial
@@ -72,10 +104,10 @@ class DemoSource(TelemetrySource):
 
 class SerialSource(TelemetrySource):
     """
-    Protocol:
-      Setpoint:  T35.0\n
-      Telemetry request: ?\n
-      Response: {"T_meas":..,"T_ref":..,"PWM":..}\n
+    Protocol (CRC8 poly 0x07):
+      Setpoint:           "T35.0*HH\n"
+      Telemetry request:  "?*HH\n"
+      Response:           '{"T_meas":..,"T_ref":..,"PWM":..}*HH\n'
     """
     def __init__(self, port: str, baud: int = 115200, timeout: float = 0.5):
         if serial is None:
@@ -108,20 +140,59 @@ class SerialSource(TelemetrySource):
     def set_setpoint(self, t_ref_c: float):
         if not self.is_connected():
             return
-        cmd = f"T{t_ref_c:.1f}\n".encode("ascii")
-        self.ser.write(cmd)
+        payload = f"T{float(t_ref_c):.1f}"
+        self.ser.write(add_crc_frame(payload))
+
+    def _read_valid_payload_line(self, max_lines: int = 5) -> str | None:
+        """
+        Reads up to max_lines lines and returns a payload string (CRC-checked if framed),
+        or None if nothing valid arrived.
+        """
+        if not self.is_connected():
+            return None
+
+        for _ in range(max_lines):
+            line = self.ser.readline().decode("ascii", errors="ignore").strip()
+            if not line:
+                continue
+
+            # Prefer CRC-framed messages
+            if "*" in line:
+                payload = strip_and_check_crc(line)
+                if payload is None:
+                    # CRC mismatch or malformed frame -> ignore
+                    continue
+                return payload
+
+            # Fallback: accept non-CRC payloads (useful if firmware in simple mode)
+            return line
+
+        return None
 
     def read_telemetry(self) -> dict:
         if not self.is_connected():
             return {}
-        self.ser.write(b"?\n")
-        line = self.ser.readline().decode("ascii", errors="ignore").strip()
-        if not line:
-            return {}
-        # If device sends ACK/ERR lines, ignore them
-        if not line.startswith("{"):
-            return {}
-        return json.loads(line)
+
+        # request telemetry with CRC
+        self.ser.write(add_crc_frame("?"))
+
+        # try a few lines because device might send OK/ERR before JSON
+        for _ in range(5):
+            payload = self._read_valid_payload_line(max_lines=1)
+            if payload is None:
+                continue
+
+            # ignore ACK/ERR or other text
+            if not payload.startswith("{"):
+                continue
+
+            try:
+                return json.loads(payload)
+            except Exception:
+                # malformed JSON -> ignore and keep trying
+                continue
+
+        return {}
 
 
 class App(tk.Tk):

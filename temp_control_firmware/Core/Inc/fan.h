@@ -17,7 +17,6 @@
 
 #include <stdbool.h>
 
-void Fan_Init(void);
 void Fan_Set(bool on);
 
 #endif /* INC_FAN_H_ */

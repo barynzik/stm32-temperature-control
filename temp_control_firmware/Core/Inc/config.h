@@ -10,27 +10,32 @@
 #pragma once
 
 // Control range
-#define T_SAFE_MIN_C  (30.0f)
-#define T_SAFE_MAX_C  (60.0f)
-#define T_ALARM_MIN_C (25.0f)
-#define T_ALARM_MAX_C (65.0f)
+#define T_SAFE_MIN_C   (30.0f)
+#define T_SAFE_MAX_C   (60.0f)
+
+#define T_ALARM_MIN_C  (0.0f)
+#define T_ALARM_MAX_C  (80.0f)
+
+
+#define T_SETPOINT_DEFAULT_C 35.0f
 
 
 // Sampling
 #define CONTROL_TS_S   0.1f   // 100 ms
 
 // PI gains
-#define KP             2.0f
-#define KI             0.5f
+#define KP             0.3f
+#define KI             0.2f
 
 // ADC / NTC parameters
 #define ADC_VREF       3.3f
 #define ADC_MAX        4095.0f
-#define R_FIXED        10000.0f
+#define R_FIXED 	   10000.0f
 #define NTC_BETA       3950.0f
 #define NTC_R0         10000.0f
 #define NTC_T0_K       298.15f
 // POT
 #define T_SETPOINT_MIN_C  20.0f
 #define T_SETPOINT_MAX_C  60.0f
+#define TELEMETRY_PERIOD_MS 10000U
 

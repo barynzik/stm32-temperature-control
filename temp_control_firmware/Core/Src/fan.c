@@ -11,15 +11,10 @@
  *
  */
 #include "fan.h"
-
-void Fan_Init(void)
-{
-    // TODO
-}
-
+#include "main.h"
 void Fan_Set(bool on)
 {
-    // TODO
-    (void)on;
+    HAL_GPIO_WritePin(FAN_GPIO_Port, FAN_Pin,
+                      on ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
