@@ -1,3 +1,22 @@
+/**
+ * @file setpoint.c
+ * @brief Implementation of temperature setpoint management.
+ *
+ * This file contains the implementation of the temperature setpoint logic.
+ * The setpoint value is stored internally and can be modified only through
+ * the provided API functions.
+ *
+ * All setpoint values are constrained to a predefined safe range in order
+ * to prevent unsafe operating conditions.
+ *
+ * Typical sources of setpoint changes:
+ *  - UART commands
+ *  - User button input
+ *  - PC GUI
+ *
+ * @author
+ * Borys Ovsiyenko
+ */
 #include "setpoint.h"
 #include "config.h"
 

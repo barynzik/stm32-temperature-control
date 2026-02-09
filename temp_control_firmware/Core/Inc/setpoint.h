@@ -1,8 +1,15 @@
-/*
- * setpoint.h
+/**
+ * @file setpoint.h
+ * @brief Temperature setpoint management module.
  *
- *  Created on: Jan 14, 2026
- *      Author: boris
+ * This module provides a safe and centralized interface for managing
+ * the temperature setpoint used by the control algorithm.
+ *
+ * The setpoint is automatically limited to a predefined safe range,
+ * regardless of the source of change (UART, button, GUI, etc.).
+ *
+ * @author
+ * Borys Ovsiyenko
  */
 
 #ifndef INC_SETPOINT_H_

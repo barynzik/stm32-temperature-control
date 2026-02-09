@@ -13,4 +13,5 @@
 #include <stdint.h>
 
 float Temperature_FromRaw(uint16_t raw);
+float Temperature_FromRawFiltered(uint16_t raw);
 #endif /* INC_TEMPERATURE_H_ */

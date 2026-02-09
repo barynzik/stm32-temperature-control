@@ -24,8 +24,9 @@
 #define CONTROL_TS_S   0.1f   // 100 ms
 
 // PI gains
-#define KP             0.3f
-#define KI             0.2f
+#define KP  0.7f
+#define KI  0.5f
+
 
 // ADC / NTC parameters
 #define ADC_VREF       3.3f

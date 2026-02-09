@@ -37,6 +37,7 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
+extern UART_HandleTypeDef huart3;
 
 /* USER CODE END EC */
 

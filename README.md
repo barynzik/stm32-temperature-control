@@ -38,7 +38,7 @@ documentation.
 ## Simulation and verification
 
 The steady-state accuracy requirement (1% of control range) was verified using
-a Simulink model of the thermal process and a PI controller. The simulation
+a Desktop UI model of the thermal process and a PI controller. The simulation
 includes a staircase temperature reference and demonstrates negligible
 steady-state error for all operating points.
 
@@ -77,12 +77,11 @@ and integrated into the main control loop.
 
 ## Additional user input device
 
-An additional user input device was implemented using an analog potentiometer
-connected to the ADC input of the STM32 microcontroller.
+An additional user input device was implemented using a user button
+connected to the PC13 port of the STM32 microcontroller.
 
-The potentiometer allows the user to adjust the temperature set-point locally,
-without using the serial interface. The ADC value is periodically sampled and
-converted into a temperature reference value within the allowed control range.
+The User Button allows adjusting the temperature
+without using the serial interface. The temperature value increases from precing the buttond and decreases from holding the button. Temperature adjusts within the allowed control range.
 
 This satisfies the requirement of an additional user input device.
 

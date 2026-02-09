@@ -74,11 +74,14 @@ ETH_TxPacketConfig TxConfig;
 
 ADC_HandleTypeDef hadc1;
 
+CRC_HandleTypeDef hcrc;
+
 ETH_HandleTypeDef heth;
 
 I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim7;
 
 UART_HandleTypeDef huart3;
 
@@ -97,6 +100,8 @@ static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_CRC_Init(void);
+static void MX_TIM7_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -141,6 +146,8 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_ADC1_Init();
   MX_TIM1_Init();
+  MX_CRC_Init();
+  MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
   Control_Init();
   UARTIF_Init();
@@ -171,7 +178,8 @@ int main(void)
       HAL_ADC_Stop(&hadc1);
 
       // ---------- Temperature ----------
-      float t_meas = Temperature_FromRaw(ntc_raw);
+      // float t_meas = Temperature_FromRaw(ntc_raw);
+      float t_meas = Temperature_FromRawFiltered(ntc_raw);
       float t_ref  = Setpoint_GetC();
 
       // ---------- Range flags ----------
@@ -192,7 +200,6 @@ int main(void)
 
           t_ref = Setpoint_GetC();
       }
-      printf("PC13=%d\r\n", (int)HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13));
       HAL_Delay(200);
 
       // ---------- Control + Safety ----------
@@ -200,18 +207,14 @@ int main(void)
       float pwm = 0.0f;
 
       if (alarm) {
-          // при входе в аварию сбрасываем PI, чтобы не было "ударного" PWM после выхода
           if (!prev_alarm) {
               Control_Init();
           }
 
           pwm = 0.0f;
           Heater_SetDutyPercent(0.0f);
-
-          // в аварии включаем продувку
           Fan_Set(true);
       } else {
-          // нормальный режим
           pwm = Control_Update(t_ref, t_meas);
           Heater_SetDutyPercent(pwm);
 
@@ -224,13 +227,13 @@ int main(void)
 
       prev_alarm = alarm;
 
-      // ---------- Telemetry (periodic + on request) ----------
+      // ---------- Telemetry (periodic) ----------
       bool send_tel = UARTIF_ConsumeTelemetryRequest();
 
       uint32_t now_tel = HAL_GetTick();
       if ((int32_t)(now_tel - next_tel_ms) >= 0) {
           send_tel = true;
-          next_tel_ms += TELEMETRY_PERIOD_MS;   // держим ровный период
+          next_tel_ms += TELEMETRY_PERIOD_MS;
       }
 
       if (send_tel) {
@@ -248,7 +251,6 @@ int main(void)
       if ((int32_t)(next_tick - now) > 0) {
           HAL_Delay(next_tick - now);
       } else {
-          // если вычисления/передача заняли слишком долго — пересинхронизация
           next_tick = now;
       }
   }
@@ -258,6 +260,8 @@ int main(void)
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
+}
+
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -356,6 +360,37 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief CRC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CRC_Init(void)
+{
+
+  /* USER CODE BEGIN CRC_Init 0 */
+
+  /* USER CODE END CRC_Init 0 */
+
+  /* USER CODE BEGIN CRC_Init 1 */
+
+  /* USER CODE END CRC_Init 1 */
+  hcrc.Instance = CRC;
+  hcrc.Init.DefaultPolynomialUse = DEFAULT_POLYNOMIAL_ENABLE;
+  hcrc.Init.DefaultInitValueUse = DEFAULT_INIT_VALUE_ENABLE;
+  hcrc.Init.InputDataInversionMode = CRC_INPUTDATA_INVERSION_NONE;
+  hcrc.Init.OutputDataInversionMode = CRC_OUTPUTDATA_INVERSION_DISABLE;
+  hcrc.InputDataFormat = CRC_INPUTDATA_FORMAT_BYTES;
+  if (HAL_CRC_Init(&hcrc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CRC_Init 2 */
+
+  /* USER CODE END CRC_Init 2 */
 
 }
 
@@ -533,6 +568,44 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 2 */
   HAL_TIM_MspPostInit(&htim1);
+
+}
+
+/**
+  * @brief TIM7 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM7_Init(void)
+{
+
+  /* USER CODE BEGIN TIM7_Init 0 */
+
+  /* USER CODE END TIM7_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM7_Init 1 */
+
+  /* USER CODE END TIM7_Init 1 */
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = 720 - 1;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 20000 - 1;
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM7_Init 2 */
+
+  /* USER CODE END TIM7_Init 2 */
 
 }
 
